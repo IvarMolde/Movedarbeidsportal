@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovED Arbeidslivsportal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Ikoner -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .theme-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .theme-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .feedback-correct { background-color: #064e3b; color: white; }
+        .feedback-wrong { background-color: #7f1d1d; color: white; }
+        .grammar-box { border-left: 6px solid #f59e0b; }
+        .animate-pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        
+        /* Stil for logo */
+        .main-logo {
+            max-width: 400px;
+            width: 100%;
+            height: auto;
+            margin-bottom: 2rem;
+        }
+        .header-logo {
+            max-width: 150px;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="text-slate-900 leading-relaxed">
+
+    <div id="app" class="min-h-screen flex flex-col"></div>
+
+    <script>
+        // --- DATASTRUKTURER ---
+
+        const coursesA2 = [
+            {
+                id: 'a2-t1', title: 'Synonymer og antonymer', icon: 'languages', color: 'bg-blue-100',
+                grammarTheory: 'Synonymer er forskjellige ord som betyr nesten det samme, som "sjef" og "leder". Antonymer er ord som betyr det motsatte av hverandre, som "heltid" og "deltid".',
+                text: 'I det norske arbeidslivet bruker vi mange ord med lik betydning, som "en ansatt" og "en arbeidstaker". Antonymer er ord som står i kontrast, som "heltid" og "deltid". Når du starter i en ny jobb, skriver du under en kontrakt, og når du blir gammel går du av med pensjon.',
+                tasks: [
+                    { type: 'choice', q: 'Finn et synonym for ordet "leder":', options: ['Sjef', 'Ansatt', 'Vikar'], correct: 0 },
+                    { type: 'choice', q: 'Hva er antonymet til "heltid"?', options: ['Fast jobb', 'Deltid', 'Overtid'], correct: 1 },
+                    { type: 'choice', q: 'Hvilket ord betyr det samme som "ansatt"?', options: ['Arbeidsgiver', 'Arbeidstaker', 'Lærling'], correct: 1 },
+                    { type: 'tf', q: 'Ordet "lønn" betyr det samme som "inntekt".', answer: true },
+                    { type: 'blank', text: 'Når man slutter å jobbe fordi man er gammel, får man [blank].', answer: 'pensjon' }
+                ]
+            },
+            {
+                id: 'a2-t2', title: 'Ord og begreper', icon: 'book-open', color: 'bg-emerald-100',
+                text: 'Arbeidsgiver er firmaet du jobber for. Før du starter må du ha en skriftlig arbeidskontrakt. Hvis du jobber mer enn kontrakten sier, kalles det overtid. Ved sykdom bruker man egenmelding i inntil tre dager.',
+                tasks: [
+                    { type: 'drag-words', q: 'Koble ord til riktig forklaring:', pairs: [
+                        { word: 'Overtid', def: 'Jobbe mer enn avtalt' },
+                        { word: 'Egenmelding', def: 'Melding om sykdom' },
+                        { word: 'Fagforening', def: 'Hjelper arbeidere' }
+                    ]},
+                    { type: 'tf', q: 'En arbeidskontrakt kan være muntlig i Norge.', answer: false },
+                    { type: 'choice', q: 'Hvem gir deg arbeidsoppgaver?', options: ['Kollegaen', 'Arbeidsgiveren', 'Lærlingen'], correct: 1 },
+                    { type: 'blank', text: 'En [blank] kontrakt er påbudt i Norge.', answer: 'skriftlig' },
+                    { type: 'choice', q: 'Hva betyr ordet "vikar"?', options: ['En sjef', 'En midlertidig ansatt', 'En som eier firmaet'], correct: 1 }
+                ]
+            },
+            {
+                id: 'a2-t3', title: 'Ferieloven', icon: 'palmtree', color: 'bg-orange-100',
+                text: 'Alle ansatte har rett på ferie. Loven sier 25 virkedager (4 uker + 1 dag). Feriepenger tjenes opp året før du skal ha ferie.',
+                tasks: [
+                    { type: 'choice', q: 'Hvor mange virkedager ferie gir loven?', options: ['21', '25', '30'], correct: 1 },
+                    { type: 'choice', q: 'Når tjener man opp feriepenger?', options: ['Samme år', 'Året før', 'Når man slutter'], correct: 1 },
+                    { type: 'tf', q: 'Alle har rett til ferie i Norge.', answer: true },
+                    { type: 'blank', text: 'Lønn man får når man har ferie kalles [blank].', answer: 'feriepenger' },
+                    { type: 'choice', q: 'Er lørdag en virkedag i ferieloven?', options: ['Ja', 'Nei', 'Bare i juni'], correct: 0 }
+                ]
+            },
+            {
+                id: 'a2-t4', title: 'Vikar og permisjon', icon: 'user-plus', color: 'bg-purple-100',
+                text: 'En vikar er en midlertidig ansatt. Permisjon kan være lønnet (fødsel) eller ulønnet (utdanning). Man må søke skriftlig.',
+                tasks: [
+                    { type: 'blank', text: 'En person som jobber i stedet for en annen kalles en [blank].', answer: 'vikar' },
+                    { type: 'choice', q: 'Hva kalles fri fra jobb i en periode?', options: ['Oppsigelse', 'Permisjon', 'Overtid'], correct: 1 },
+                    { type: 'tf', q: 'Alle permisjoner er uten lønn.', answer: false },
+                    { type: 'choice', q: 'Hvordan søker man om permisjon?', options: ['Muntlig i lunsjen', 'Skriftlig søknad', 'Bare bli hjemme'], correct: 1 },
+                    { type: 'choice', q: 'Hva er en gyldig grunn til permisjon?', options: ['Lunsj', 'Videreutdanning', 'Helg'], correct: 1 }
+                ]
+            },
+            {
+                id: 'a2-t5', title: 'Substantivbøyning', icon: 'type', color: 'bg-pink-100',
+                grammarTheory: 'Substantiv bøyes i entall og flertall. En kontrakt (ubestemt) -> kontrakten (bestemt). Kontrakter (ubestemt flertall) -> kontraktene (bestemt flertall).',
+                text: 'Vi bruker ord som en kontrakt, en time og en sjef hver dag. Det er viktig å bruke riktig form.',
+                tasks: [
+                    { type: 'blank', text: 'Vi må signere [blank] (bestemt form av "en kontrakt") i dag.', answer: 'kontrakten' },
+                    { type: 'blank', text: 'Sjefen snakker med de [blank] (bestemt flertall av "en ansatt").', answer: 'ansatte' },
+                    { type: 'choice', q: 'Hva er ubestemt flertall av "en time"?', options: ['Timene', 'Timer', 'Timen'], correct: 1 },
+                    { type: 'tf', q: 'Bestemt form av "en sjef" er "sjefen".', answer: true },
+                    { type: 'sort-words', q: 'Sett ordene i rekkefølge:', sentence: ['Jeg', 'har', 'lest', 'alle', 'kontraktene.'], shuffled: ['alle', 'lest', 'Jeg', 'har', 'kontraktene.'] }
+                ]
+            },
+            {
+                id: 'a2-t6', title: 'V2-regelen', icon: 'zap', color: 'bg-yellow-100',
+                grammarTheory: 'V2-regelen: Verbet (gjøre-ordet) skal stå på plass nummer 2. Eksempel: "I dag (1) jobber (2) jeg."',
+                text: 'God ordstilling er viktig for å bli forstått på arbeidsplassen.',
+                tasks: [
+                    { type: 'sort-words', q: 'Sett ordene riktig:', sentence: ['I', 'dag', 'skriver', 'jeg', 'kontrakten.'], shuffled: ['skriver', 'jeg', 'I', 'dag', 'kontrakten.'] },
+                    { type: 'choice', q: 'Hvilken setning er riktig?', options: ['Nå jeg starter.', 'Nå starter jeg.', 'Jeg nå starter.'], correct: 1 },
+                    { type: 'tf', q: 'Verbet står alltid sist i norske setninger.', answer: false },
+                    { type: 'blank', text: 'I morgen [blank] jeg på jobb (verb: skal).', answer: 'skal' },
+                    { type: 'sort-words', q: 'Sett ordene i rekkefølge:', sentence: ['Etterpå', 'spiser', 'vi', 'lunsj.'], shuffled: ['vi', 'lunsj.', 'spiser', 'Etterpå'] }
+                ]
+            },
+            {
+                id: 'a2-t7', title: 'Oppsigelse', icon: 'log-out', color: 'bg-red-100',
+                text: 'Oppsigelse skal være skriftlig. Det er vanligvis 1 til 3 måneder oppsigelsestid.',
+                tasks: [
+                    { type: 'tf', q: 'Du kan si opp via SMS.', answer: false },
+                    { type: 'blank', text: 'Tiden fra du sier opp til du slutter kalles [blank].', answer: 'oppsigelsestid' },
+                    { type: 'choice', q: 'Hvor lang er vanligvis oppsigelsestiden?', options: ['1 uke', '1-3 måneder', '1 år'], correct: 1 },
+                    { type: 'choice', q: 'Hva må en oppsigelse være?', options: ['Muntlig', 'Skriftlig', 'Hemmelig'], correct: 1 },
+                    { type: 'choice', q: 'Hva skjer i oppsigelsestiden?', options: ['Du slutter med en gang', 'Du må jobbe som vanlig', 'Du får ikke lønn'], correct: 1 }
+                ]
+            },
+            {
+                id: 'a2-t8', title: 'Lønnsslipp', icon: 'banknote', color: 'bg-indigo-100',
+                text: 'Lønnsslippen viser bruttolønn (før skatt) og nettolønn (utbetalt).',
+                tasks: [
+                    { type: 'choice', q: 'Hva er bruttolønn?', options: ['Etter skatt', 'Før skatt', 'Feriepenger'], correct: 1 },
+                    { type: 'choice', q: 'Hva kalles pengene du får utbetalt?', options: ['Bruttolønn', 'Nettolønn', 'Skattetrekk'], correct: 1 },
+                    { type: 'tf', q: 'Lønnsslippen viser hvor mye skatt du betaler.', answer: true },
+                    { type: 'blank', text: 'Lønn før skatt kalles [blank].', answer: 'brutto' },
+                    { type: 'choice', q: 'Hvem sender deg lønnsslippen?', options: ['NAV', 'Arbeidsgiver', 'Politiet'], correct: 1 }
+                ]
+            },
+            {
+                id: 'a2-t9', title: 'Arbeidsmiljø', icon: 'smile', color: 'bg-cyan-100',
+                text: 'Et godt arbeidsmiljø betyr trivsel og sikkerhet. Samarbeid er viktig.',
+                tasks: [
+                    { type: 'choice', q: 'Hva er viktig for et godt miljø?', options: ['Å jobbe alene', 'Samarbeid og trivsel', 'Å aldri pause'], correct: 1 },
+                    { type: 'tf', q: 'Arbeidsmiljø handler bare om maskiner.', answer: false },
+                    { type: 'choice', q: 'Hva gjør du ved problemer?', options: ['Slutte med en gang', 'Snakke med sjef/tillitsvalgt', 'Tie stille'], correct: 1 },
+                    { type: 'blank', text: 'En god arbeidsplass har godt arbeids[blank].', answer: 'miljø' },
+                    { type: 'choice', q: 'Hvem har ansvar for miljøet?', options: ['Bare sjefen', 'Bare ansatte', 'Begge'], correct: 2 }
+                ]
+            },
+            {
+                id: 'a2-t10', title: 'Refleksjon A2', icon: 'brain', color: 'bg-slate-200',
+                text: 'Som ansatt har du både rettigheter og plikter.',
+                tasks: [
+                    { type: 'choice', q: 'Hva er en plikt?', options: ['Få lønn', 'Komme presis', 'Ha ferie'], correct: 1 },
+                    { type: 'tf', q: 'En god kollega hjelper andre.', answer: true },
+                    { type: 'choice', q: 'Hva betyr ærlighet?', options: ['Stjele tid', 'Snakke sant', 'Jobbe sent'], correct: 1 },
+                    { type: 'blank', text: 'Du har rettigheter og [blank].', answer: 'plikter' },
+                    { type: 'choice', q: 'Hva betyr lojalitet?', options: ['Sladre', 'Støtte bedriften', 'Bytte jobb ofte'], correct: 1 }
+                ]
+            }
+        ];
+
+        const coursesB1 = [
+            {
+                id: 'b1-t1', title: 'Inkluderende arbeidsliv (IA)', icon: 'users', color: 'bg-blue-200',
+                text: 'IA-avtalen skal forebygge sykefravær og hindre diskriminering.',
+                tasks: [
+                    { type: 'choice', q: 'Hva er målet med IA?', options: ['Øke skatt', 'Forebygge sykefravær', 'Gi mer fri'], correct: 1 },
+                    { type: 'choice', q: 'Hva betyr tilrettelegging?', options: ['Kjøpe lunsj', 'Tilpasse jobben', 'Jobbe natt'], correct: 1 },
+                    { type: 'tf', q: 'IA-avtalen er for alle bedrifter.', answer: true },
+                    { type: 'blank', text: 'Målet er å redusere syke[blank].', answer: 'fravær' },
+                    { type: 'choice', q: 'Hva er diskriminering?', options: ['Samarbeid', 'Urettferdighet', 'Inkludering'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t2', title: 'Tariff og streik', icon: 'building-2', color: 'bg-orange-200',
+                text: 'Tariffavtaler er kollektive avtaler om lønn og vilkår.',
+                tasks: [
+                    { type: 'choice', q: 'Hva er en lockout?', options: ['Streik', 'Stengt ute av sjefen', 'Mer lønn'], correct: 1 },
+                    { type: 'tf', q: 'Streik er ulovlig under avtaleperioden.', answer: true },
+                    { type: 'drag-words', q: 'Koble begreper:', pairs: [
+                        { word: 'Streik', def: 'Ansatte stopper jobben' },
+                        { word: 'Lockout', def: 'Sjefen stenger døra' },
+                        { word: 'Tariff', def: 'Avtale om lønn' }
+                    ]},
+                    { type: 'blank', text: 'Når partene ikke blir enige, kan det bli [blank].', answer: 'streik' },
+                    { type: 'choice', q: 'Hvem hjelper partene?', options: ['Politiet', 'Riksmekleren', 'Banken'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t3', title: 'Permittering', icon: 'clock-4', color: 'bg-emerald-200',
+                text: 'Permittering er midlertidig fritak for jobb pga krise.',
+                tasks: [
+                    { type: 'tf', q: 'Permittering er permanent.', answer: false },
+                    { type: 'choice', q: 'Hvem betaler penger ved permittering?', options: ['Sjefen', 'NAV', 'Lånekassen'], correct: 1 },
+                    { type: 'blank', text: 'Permittering er en [blank] ordning.', answer: 'midlertidig' },
+                    { type: 'choice', q: 'Hva er årsaken til permittering?', options: ['Sykdom', 'Økonomisk krise', 'Ferie'], correct: 1 },
+                    { type: 'choice', q: 'Er du fortsatt ansatt?', options: ['Nei', 'Ja', 'Vet ikke'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t4', title: 'Tillitsvalgt', icon: 'user-check', color: 'bg-slate-200',
+                text: 'En tillitsvalgt er de ansattes talsmann og hjelper i konflikter.',
+                tasks: [
+                    { type: 'blank', text: 'De ansattes representant kalles en tillits[blank].', answer: 'valgt' },
+                    { type: 'tf', q: 'Sjefen velger tillitsvalgt.', answer: false },
+                    { type: 'choice', q: 'Hvem velger tillitsvalgt?', options: ['Sjefen', 'Ansatte', 'Staten'], correct: 1 },
+                    { type: 'choice', q: 'Hva gjør en tillitsvalgt?', options: ['Vasker', 'Forhandler', 'Kjøper mat'], correct: 1 },
+                    { type: 'choice', q: 'Når trenger du hjelp?', options: ['Ved sult', 'Ved konflikt på jobb', 'Ved lunsj'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t5', title: 'Passiv form (Grammatikk)', icon: 'zap', color: 'bg-red-200',
+                grammarTheory: 'Passiv brukes når handlingen er viktigst. Eksempel: "Bilen vaskes" (s-passiv) eller "Bilen blir vasket" (bli-passiv).',
+                text: 'Mange regler er skrevet i passiv: "Søknaden sendes innen fristen."',
+                tasks: [
+                    { type: 'blank', text: 'Sjefen signerer. Avtalen [blank] (s-passiv).', answer: 'signeres' },
+                    { type: 'choice', q: 'Gjør om: "De vasker kontoret."', options: ['Kontoret blir vasket', 'Kontoret vaskes', 'De blir vasket'], correct: 0 },
+                    { type: 'tf', q: '"Bilen vaskes" er aktiv.', answer: false },
+                    { type: 'sort-words', q: 'Sett ordene riktig:', sentence: ['Kontrakten', 'skal', 'signeres', 'av', 'sjefen.'], shuffled: ['av', 'signeres', 'skal', 'Kontrakten', 'sjefen.'] },
+                    { type: 'choice', q: 'Når bruker vi ofte s-passiv?', options: ['I tale', 'I formelle tekster', 'I lunsjen'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t6', title: 'Subjunksjoner (Grammatikk)', icon: 'link', color: 'bg-indigo-200',
+                grammarTheory: 'Subjunksjoner starter leddsetninger: "fordi", "selv om", "hvis". Husk: "ikke" kommer før verbet!',
+                text: 'Vi bruker disse for å forklare årsaker: "Jeg jobber fordi jeg må."',
+                tasks: [
+                    { type: 'choice', q: 'Hvilken passer? "Jeg går ___ jeg er syk."', options: ['hvis', 'selv om', 'fordi'], correct: 1 },
+                    { type: 'sort-words', q: 'Sett ordene riktig:', sentence: ['fordi', 'han', 'ikke', 'har', 'lønn.'], shuffled: ['har', 'ikke', 'fordi', 'han', 'lønn.'] },
+                    { type: 'tf', q: '"Ikke" kommer etter verbet i leddsetninger.', answer: false },
+                    { type: 'blank', text: 'Jeg kommer hvis jeg [blank] tid.', answer: 'har' },
+                    { type: 'choice', q: 'Hva starter en leddsetning?', options: ['Punktum', 'Subjunksjon', 'Sjefen'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t7', title: 'Arbeidsmiljøloven (AML)', icon: 'shield-check', color: 'bg-yellow-200',
+                text: 'AML sikrer trygge forhold og rett til pauser.',
+                tasks: [
+                    { type: 'choice', q: 'Hvem kontrollerer AML?', options: ['Politiet', 'Arbeidstilsynet', 'NAV'], correct: 1 },
+                    { type: 'tf', q: 'AML gir regler for arbeidstid.', answer: true },
+                    { type: 'blank', text: 'AML står for Arbeidsmiljø[blank].', answer: 'loven' },
+                    { type: 'choice', q: 'Hva er vern mot trakassering?', options: ['Beskyttelse', 'Gratis kaffe', 'Ferie'], correct: 0 },
+                    { type: 'choice', q: 'Rett på pause etter:', options: ['1 time', '5,5 timer', '8 timer'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t8', title: 'Den nordiske modellen', icon: 'globe', color: 'bg-cyan-200',
+                text: 'Modellen bygger på trepartssamarbeid og høy tillit.',
+                tasks: [
+                    { type: 'choice', q: 'Hva kjennetegner modellen?', options: ['Konflikt', 'Tillit og samarbeid', 'Ingen skatt'], correct: 1 },
+                    { type: 'tf', q: 'Tillit er viktig i Norge.', answer: true },
+                    { type: 'choice', q: 'De tre partene er:', options: ['Sjef, bank, politi', 'Stat, arb.giver, arb.taker', 'Elev, lærer, rektor'], correct: 1 },
+                    { type: 'blank', text: 'Det kalles [blank]samarbeid.', answer: 'treparts' },
+                    { type: 'choice', q: 'Små lønnsforskjeller gir:', options: ['Misunnelse', 'Stabilitet', 'Fattigdom'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t9', title: 'Formell kommunikasjon', icon: 'mail', color: 'bg-purple-200',
+                text: 'I B1 må man kunne skrive formelt og profesjonelt.',
+                tasks: [
+                    { type: 'choice', q: 'Hva er mest formelt?', options: ['Fikk fyken', 'Arbeidsforholdet er avsluttet', 'Slutta'], correct: 1 },
+                    { type: 'tf', q: 'Bruk uformelt språk i søknad.', answer: false },
+                    { type: 'choice', q: 'Start formell e-post:', options: ['Halla', 'Hei / Til [Navn]', 'Skjera'], correct: 1 },
+                    { type: 'blank', text: 'Profesjonell prat er [blank].', answer: 'viktig' },
+                    { type: 'choice', q: 'Utestående lønn betyr:', options: ['Lønn ute', 'Lønn du skal få', 'Brukt lønn'], correct: 1 }
+                ]
+            },
+            {
+                id: 'b1-t10', title: 'Refleksjon og Etikk', icon: 'scale', color: 'bg-gray-200',
+                text: 'Yrkesetikk handler om moral og taushetsplikt.',
+                tasks: [
+                    { type: 'tf', q: 'Taushetsplikt varer evig.', answer: true },
+                    { type: 'choice', q: 'Hva er yrkesetikk?', options: ['Jobbe fort', 'Riktig og galt regler', 'Klær'], correct: 1 },
+                    { type: 'choice', q: 'Hva gjør du ved lovbrudd?', options: ['Ingenting', 'Varsle', 'Hjelpe'], correct: 1 },
+                    { type: 'blank', text: 'Si ifra kalles å [blank].', answer: 'varsle' },
+                    { type: 'choice', q: 'Hvorfor taushetsplikt?', options: ['Skjule feil', 'Beskytte personvern', 'Gøy'], correct: 1 }
+                ]
+            }
+        ];
+
+        // --- APP STATE ---
+        let state = {
+            view: 'home', 
+            level: null,
+            activeTheme: null,
+            currentTaskIdx: 0,
+            score: 0,
+            lives: 3,
+            streak: 0,
+            history: JSON.parse(localStorage.getItem('moved_portal_v2')) || {}
+        };
+
+        function save() { localStorage.setItem('moved_portal_v2', JSON.stringify(state.history)); }
+
+        // --- LOGIKK ---
+        function setView(v) { state.view = v; render(); window.scrollTo(0,0); }
+        function selectLevel(lvl) { state.level = lvl; setView('dashboard'); }
+        function goHome() { state.level = null; setView('home'); }
+
+        function startTheme(theme) {
+            state.activeTheme = theme;
+            state.currentTaskIdx = 0;
+            state.score = 0;
+            state.lives = 3;
+            state.streak = 0;
+            setView('reading');
+        }
+
+        function checkAnswer(isCorrect) {
+            const overlay = document.getElementById('feedback-overlay');
+            overlay.classList.remove('hidden');
+            
+            if (isCorrect) {
+                state.score += 100 + (state.streak * 20);
+                state.streak++;
+                overlay.className = "absolute inset-0 z-50 flex flex-col items-center justify-center text-center p-10 feedback-correct animate-pop";
+                overlay.innerHTML = `
+                    <div class="space-y-6 text-white">
+                        <div class="bg-white/20 w-32 h-32 rounded-full flex items-center justify-center mx-auto">
+                            <i data-lucide="star" class="w-20 h-20 text-yellow-400 fill-yellow-400 animate-bounce"></i>
+                        </div>
+                        <h2 class="text-6xl font-black uppercase italic">Fantastisk!</h2>
+                        <p class="text-2xl font-bold">+${100 + ((state.streak-1)*20)} poeng</p>
+                        <button onclick="nextTask()" class="mt-8 bg-white text-emerald-900 px-16 py-5 rounded-full font-black text-2xl shadow-xl hover:scale-105 transition-transform">NESTE</button>
+                    </div>`;
+            } else {
+                state.lives--;
+                state.streak = 0;
+                overlay.className = "absolute inset-0 z-50 flex flex-col items-center justify-center text-center p-10 feedback-wrong animate-pop";
+                overlay.innerHTML = `
+                    <div class="space-y-6 text-white">
+                        <div class="bg-white/20 w-32 h-32 rounded-full flex items-center justify-center mx-auto">
+                            <i data-lucide="alert-circle" class="w-20 h-20 text-white animate-pulse"></i>
+                        </div>
+                        <h2 class="text-6xl font-black uppercase">Ikke helt...</h2>
+                        <p class="text-xl opacity-90 font-medium">Prøv igjen!</p>
+                        <button onclick="nextTask()" class="mt-8 bg-white text-red-900 px-16 py-5 rounded-full font-black text-2xl shadow-xl hover:scale-105 transition-transform">FORTSATT</button>
+                    </div>`;
+            }
+            lucide.createIcons();
+            if (state.lives <= 0) setTimeout(() => setView('gameover'), 1200);
+        }
+
+        function nextTask() {
+            if (state.currentTaskIdx < state.activeTheme.tasks.length - 1) {
+                state.currentTaskIdx++;
+                render();
+            } else {
+                const key = `${state.level}-${state.activeTheme.id}`;
+                state.history[key] = { completed: true, score: Math.max(state.score, state.history[key]?.score || 0) };
+                save();
+                setView('summary');
+            }
+        }
+
+        // --- RENDERING ---
+
+        function render() {
+            const root = document.getElementById('app');
+            root.innerHTML = '';
+            if (state.view === 'home') renderHome(root);
+            else if (state.view === 'dashboard') renderDashboard(root);
+            else if (state.view === 'reading') renderReading(root);
+            else if (state.view === 'playing') renderPlaying(root);
+            else if (state.view === 'summary') renderSummary(root, false);
+            else if (state.view === 'gameover') renderSummary(root, true);
+            lucide.createIcons();
+        }
+
+        function renderHome(root) {
+            root.innerHTML = `
+                <div class="flex-grow flex flex-col items-center justify-center p-6 text-center">
+                    <div class="max-w-3xl w-full space-y-8 text-slate-900">
+                        <img src="moved_logo.png" alt="MovED Logo" class="main-logo mx-auto" onerror="this.src='https://via.placeholder.com/400x150?text=MovED+Logo'">
+                        <div class="space-y-4">
+                            <h1 class="text-5xl font-black tracking-tighter uppercase italic">MovED</h1>
+                            <h2 class="text-3xl font-bold text-indigo-700 uppercase tracking-widest">Arbeidslivsportal</h2>
+                            <p class="text-slate-500 font-medium text-xl max-w-xl mx-auto leading-relaxed">Mestre norsk arbeidsliv gjennom 100 interaktive oppgaver og pedagogisk teori.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
+                            <button onclick="selectLevel('A2')" class="bg-white p-10 rounded-[2.5rem] border-b-[8px] border-slate-200 hover:border-blue-600 hover:-translate-y-2 transition-all shadow-xl group">
+                                <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl font-black group-hover:scale-110 transition-transform">A2</div>
+                                <h3 class="text-2xl font-black uppercase text-slate-800">Nivå A2</h3>
+                            </button>
+                            <button onclick="selectLevel('B1')" class="bg-white p-10 rounded-[2.5rem] border-b-[8px] border-slate-200 hover:border-emerald-600 hover:-translate-y-2 transition-all shadow-xl group">
+                                <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl font-black group-hover:scale-110 transition-transform">B1</div>
+                                <h3 class="text-2xl font-black uppercase text-slate-800">Nivå B1</h3>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderDashboard(root) {
+            const themes = state.level === 'A2' ? coursesA2 : coursesB1;
+            const completed = themes.filter(t => state.history[`${state.level}-${t.id}`]?.completed).length;
+            const progress = Math.round((completed / themes.length) * 100);
+
+            root.innerHTML = `
+                <div class="max-w-7xl w-full mx-auto p-6 md:p-12 space-y-12 text-slate-900">
+                    <div class="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-10 rounded-[3rem] shadow-xl border-2 border-slate-50">
+                        <div class="space-y-6">
+                            <img src="moved_logo.png" alt="MovED Logo" class="header-logo" onerror="this.style.display='none'">
+                            <div>
+                                <button onclick="setView('home')" class="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest hover:underline mb-2"><i data-lucide="arrow-left" class="w-4 h-4"></i> Tilbake</button>
+                                <h1 class="text-4xl font-black tracking-tight uppercase">Dashboard <span class="text-indigo-600">${state.level}</span></h1>
+                            </div>
+                        </div>
+                        <div class="bg-indigo-600 p-8 rounded-[2rem] text-white flex items-center gap-8 shadow-2xl">
+                            <div class="text-right">
+                                <p class="text-xs font-black uppercase opacity-70 tracking-widest">Fremgang</p>
+                                <p class="text-5xl font-black">${progress}%</p>
+                            </div>
+                            <div class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-white"><i data-lucide="medal" class="w-8 h-8"></i></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
+                        ${themes.map(t => {
+                            const stats = state.history[`${state.level}-${t.id}`];
+                            return `
+                                <button onclick='startTheme(${JSON.stringify(t).replace(/'/g, "&#39;")})' class="theme-card bg-white p-8 rounded-[2.5rem] border-b-[8px] border-slate-200 hover:border-indigo-600 transition-all text-left flex flex-col min-h-[280px]">
+                                    <div class="w-14 h-14 ${t.color} rounded-2xl flex items-center justify-center mb-8 text-slate-800 shadow-sm"><i data-lucide="${t.icon}" class="w-7 h-7"></i></div>
+                                    <h3 class="text-xl font-black text-slate-900 leading-tight flex-grow">${t.title}</h3>
+                                    <div class="mt-4 pt-4 border-t-2 border-slate-50 flex items-center justify-between">
+                                        ${stats?.completed ? '<span class="text-emerald-600 font-black text-[10px] uppercase flex items-center gap-1"><i data-lucide="check" class="w-4 h-4"></i> Ferdig</span>' : '<span class="text-slate-400 font-black text-[10px] uppercase">Start nå</span>'}
+                                        ${stats?.score ? `<span class="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-black">${stats.score}</span>` : ''}
+                                    </div>
+                                </button>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+        }
+
+        function renderReading(root) {
+            const t = state.activeTheme;
+            root.innerHTML = `
+                <div class="flex-grow flex flex-col items-center p-6 md:p-12 text-slate-900">
+                    <div class="max-w-3xl w-full bg-white rounded-[4rem] shadow-2xl overflow-hidden animate-pop border-2 border-slate-100">
+                        <div class="p-16 ${t.color} flex flex-col items-center text-center">
+                            <div class="p-6 bg-white rounded-3xl shadow-lg mb-8"><i data-lucide="${t.icon}" class="w-12 h-12 text-slate-800"></i></div>
+                            <h2 class="text-5xl font-black tracking-tighter uppercase leading-none">${t.title}</h2>
+                        </div>
+                        <div class="p-16 space-y-12">
+                            <div class="text-2xl text-slate-800 font-medium leading-relaxed space-y-6 text-slate-900">
+                                ${t.text.split('. ').map(s => `<p>${s}${s.endsWith('.') ? '' : '.'}</p>`).join('')}
+                            </div>
+                            <button onclick="setView('playing')" class="w-full py-8 bg-indigo-600 text-white rounded-[2.5rem] font-black text-3xl hover:bg-indigo-700 shadow-2xl transition-all active:scale-95 uppercase tracking-widest">Jeg er klar!</button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderPlaying(root) {
+            const t = state.activeTheme;
+            const task = t.tasks[state.currentTaskIdx];
+            const progress = (state.currentTaskIdx / t.tasks.length) * 100;
+
+            root.innerHTML = `
+                <div class="flex-grow flex flex-col items-center p-6 md:p-12 text-slate-900">
+                    <div class="max-w-4xl w-full space-y-8">
+                        <div class="flex items-center justify-between px-6">
+                            <button onclick="setView('dashboard')" class="p-4 bg-white rounded-2xl shadow-md text-slate-400 hover:text-indigo-600 transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
+                            <div class="flex gap-2 bg-white p-3 rounded-full shadow-md">
+                                ${[0,1,2].map(i => `<i data-lucide="heart" class="w-8 h-8 ${i < state.lives ? 'text-red-600 fill-red-600' : 'text-slate-100'}"></i>`).join('')}
+                            </div>
+                            <div class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-2xl shadow-lg">${state.score}</div>
+                        </div>
+
+                        ${t.grammarTheory ? `
+                        <div class="grammar-box bg-amber-50 p-8 rounded-[2rem] shadow-sm animate-pop border-2 border-amber-200">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="bg-amber-400 p-2 rounded-lg text-white"><i data-lucide="lightbulb" class="w-6 h-6"></i></div>
+                                <h4 class="text-sm font-black text-amber-600 uppercase tracking-widest">Grammatikkhjelp</h4>
+                            </div>
+                            <p class="text-xl font-bold text-amber-900 leading-snug">${t.grammarTheory}</p>
+                        </div>` : ''}
+
+                        <div class="bg-white rounded-[4rem] p-16 shadow-2xl border-2 border-slate-50 relative overflow-hidden min-h-[550px] flex flex-col justify-center">
+                            <div id="feedback-overlay" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center text-center p-16 rounded-[4rem]"></div>
+                            
+                            <div class="mb-10">
+                                <div class="w-full bg-slate-100 h-3 rounded-full mb-8"><div class="bg-indigo-500 h-full rounded-full transition-all duration-700" style="width: ${progress}%"></div></div>
+                                <span class="text-xs font-black text-indigo-400 uppercase tracking-widest mb-2 block">Oppgave ${state.currentTaskIdx + 1} av ${t.tasks.length}</span>
+                                <h3 class="text-4xl font-black text-slate-900 tracking-tight leading-tight">${task.q || 'Fyll inn riktig svar:'}</h3>
+                            </div>
+
+                            <div class="space-y-4">
+                                ${renderTaskUI(task)}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderTaskUI(task) {
+            if (task.type === 'choice') {
+                return task.options.map((opt, i) => `
+                    <button onclick="checkAnswer(${i === task.correct})" class="w-full p-6 text-left border-2 border-slate-200 bg-white hover:border-indigo-500 hover:bg-indigo-50 rounded-3xl transition-all font-bold text-xl flex justify-between items-center group">
+                        <span>${opt}</span>
+                        <i data-lucide="chevron-right" class="w-6 h-6 text-slate-200 group-hover:text-indigo-500"></i>
+                    </button>`).join('');
+            }
+            if (task.type === 'tf') {
+                return `
+                    <div class="grid grid-cols-2 gap-6 pt-6">
+                        <button onclick="checkAnswer(${task.answer === true})" class="p-16 border-4 border-emerald-100 bg-emerald-50 text-emerald-700 rounded-[3rem] font-black text-4xl hover:bg-emerald-100 active:scale-95 transition-all uppercase">RETT</button>
+                        <button onclick="checkAnswer(${task.answer === false})" class="p-16 border-4 border-red-100 bg-red-50 text-red-700 rounded-[3rem] font-black text-4xl hover:bg-red-100 active:scale-95 transition-all uppercase">GALT</button>
+                    </div>`;
+            }
+            if (task.type === 'blank') {
+                return `
+                    <div class="space-y-8">
+                        <div class="p-12 bg-slate-50 rounded-[2.5rem] text-center font-bold text-slate-800 italic text-3xl leading-relaxed">
+                            "${task.text.replace('[blank]', '<span class="text-indigo-600 underline">_______</span>')}"
+                        </div>
+                        <div class="flex flex-col gap-4">
+                            <!-- Lagt til autocapitalize="none" for å hindre tvungen stor bokstav -->
+                            <input id="blank-input" type="text" autocapitalize="none" spellcheck="false" class="w-full p-6 border-4 border-slate-200 rounded-3xl outline-none text-4xl font-black text-center uppercase focus:border-indigo-600 transition-colors" placeholder="Skriv her...">
+                            <button onclick="checkBlank()" class="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black text-2xl shadow-xl hover:bg-indigo-700 transition-all uppercase tracking-widest">Sjekk svar</button>
+                        </div>
+                    </div>`;
+            }
+            if (task.type === 'drag-words') {
+                const shuffled = shuffleArray(task.pairs.map(p => p.def));
+                return `
+                    <div class="space-y-4">
+                        ${task.pairs.map((p, i) => `
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                <div class="p-5 bg-slate-900 text-white rounded-2xl font-black text-center text-lg">${p.word}</div>
+                                <select id="drag-${i}" class="p-5 border-4 border-dashed border-slate-200 rounded-2xl font-bold text-slate-500 outline-none focus:border-indigo-500 bg-slate-50 appearance-none">
+                                    <option value="">Velg forklaring...</option>
+                                    ${shuffled.map(def => `<option value="${def}">${def}</option>`).join('')}
+                                </select>
+                            </div>`).join('')}
+                        <button onclick="checkDrag()" class="w-full py-6 mt-8 bg-indigo-600 text-white rounded-3xl font-black text-2xl shadow-xl uppercase tracking-widest transition-all">Sjekk koblinger</button>
+                    </div>`;
+            }
+            if (task.type === 'sort-words') {
+                return `
+                    <div class="space-y-8">
+                        <div id="sort-zone" class="min-h-[100px] p-8 bg-indigo-50 rounded-[3rem] border-4 border-dashed border-indigo-200 flex flex-wrap gap-4 justify-center"></div>
+                        <div class="flex flex-wrap gap-4 justify-center" id="sort-options">
+                            ${task.shuffled.map((w, i) => `<button onclick="handleSortClick('${w.replace(/'/g, "\\'")}', this)" class="px-8 py-4 bg-white border-2 border-slate-200 rounded-2xl font-black text-xl hover:border-indigo-500 shadow-sm transition-all">${w}</button>`).join('')}
+                        </div>
+                        <button onclick="checkSort()" class="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black text-2xl uppercase tracking-widest">Ferdig</button>
+                    </div>`;
+            }
+            return '';
+        }
+
+        // --- INTERAKSJONER ---
+        let currentSort = [];
+        function handleSortClick(word, btn) {
+            currentSort.push(word);
+            btn.style.display = 'none';
+            const zone = document.getElementById('sort-zone');
+            const span = document.createElement('span');
+            span.className = "px-6 py-3 bg-white rounded-2xl shadow-lg font-black text-indigo-900 text-2xl animate-pop border-2 border-indigo-100";
+            span.innerText = word;
+            zone.appendChild(span);
+        }
+        function checkSort() { const task = state.activeTheme.tasks[state.currentTaskIdx]; checkAnswer(currentSort.join(' ') === task.sentence.join(' ')); currentSort = []; }
+        function checkBlank() { const val = document.getElementById('blank-input').value.toLowerCase().trim(); const correct = state.activeTheme.tasks[state.currentTaskIdx].answer.toLowerCase(); checkAnswer(val === correct); }
+        function checkDrag() { const task = state.activeTheme.tasks[state.currentTaskIdx]; let allCorrect = true; task.pairs.forEach((p, i) => { if (document.getElementById(`drag-${i}`).value !== p.def) allCorrect = false; }); checkAnswer(allCorrect); }
+
+        function renderSummary(root, isGameOver) {
+            const t = state.activeTheme;
+            root.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-6 ${isGameOver ? 'bg-slate-950' : 'bg-indigo-900'} transition-colors duration-1000">
+                    <div class="max-w-2xl w-full bg-white rounded-[5rem] p-20 shadow-2xl space-y-12 border-4 border-white/20 animate-pop text-center">
+                        <div class="w-40 h-40 ${isGameOver ? 'bg-red-100 text-red-600' : 'bg-yellow-50 text-yellow-500'} rounded-[3rem] flex items-center justify-center mx-auto shadow-inner">
+                            <i data-lucide="${isGameOver ? 'frown' : 'award'}" class="w-24 h-24"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-7xl font-black text-slate-900 mb-4 tracking-tighter uppercase leading-none">${isGameOver ? 'Uff da!' : 'Ferdig!'}</h2>
+                            <p class="text-slate-400 font-bold text-2xl">${isGameOver ? 'Du gikk tom for liv. Prøv en gang til!' : `Gratulerer! Du fullførte ${t.title}`}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-100"><p class="text-xs font-black text-slate-400 uppercase mb-2 tracking-widest text-slate-900">Score</p><p class="text-5xl font-black text-indigo-600 text-slate-900">${state.score}</p></div>
+                            <div class="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-100 text-slate-900"><p class="text-xs font-black text-slate-400 uppercase mb-2 tracking-widest text-slate-900">Liv</p><p class="text-5xl font-black text-emerald-600 text-slate-900">${state.lives}</p></div>
+                        </div>
+                        <div class="space-y-4">
+                            <button onclick='startTheme(${JSON.stringify(t).replace(/'/g, "&#39;")})' class="w-full py-8 ${isGameOver ? 'bg-red-600' : 'bg-emerald-600'} text-white rounded-[3rem] font-black text-3xl shadow-xl hover:scale-105 transition-transform uppercase">PRØV IGJEN</button>
+                            <button onclick="setView('dashboard')" class="w-full py-6 bg-slate-100 text-slate-500 rounded-[2.5rem] font-black text-xl hover:bg-slate-200 uppercase">Gå til Dashboard</button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        window.onload = render;
+    </script>
+</body>
+</html>
